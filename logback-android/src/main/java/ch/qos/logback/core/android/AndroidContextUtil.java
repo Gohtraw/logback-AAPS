@@ -19,6 +19,7 @@ import android.annotation.TargetApi;
 import android.content.ContextWrapper;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
 
@@ -38,7 +39,7 @@ import ch.qos.logback.core.CoreConstants;
  */
 public class AndroidContextUtil {
   private ContextWrapper context;
-
+  private static Uri logDirectoryUri;
   public AndroidContextUtil() {
     this(getContext());
   }
@@ -55,10 +56,41 @@ public class AndroidContextUtil {
             || value.contains(CoreConstants.VERSION_NAME_KEY);
   }
 
+  public static void setLogDirectoryUri(Uri uri) {
+    // Store the URI for use in other methods
+    logDirectoryUri = uri;
+  }
+
   /**
    * Sets properties for use in configs
    * @param context logger context whose property map is updated
    */
+  public void setupProperties(Context context) {
+    // Legacy properties (might need adjustments for Scoped Storage)
+    context.putProperty(CoreConstants.DATA_DIR_KEY, getFilesDirectoryPath());
+
+    // Scoped Storage compliant EXT_DIR_KEY
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      // For Android 10 (API 29) and above, use logDirectoryUri if available
+      if (logDirectoryUri != null) {
+        context.putProperty(CoreConstants.EXT_DIR_KEY, logDirectoryUri.toString());
+      } else {
+        // Fallback to app-specific directory if URI is not set
+        context.putProperty(CoreConstants.EXT_DIR_KEY, getExternalFilesDirectoryPath());
+      }
+    } else {
+      // For older Android versions, use the legacy approach
+      final String extDir = getMountedExternalStorageDirectoryPath(); // This will also use logDirectoryUri if set
+      if (extDir != null) {
+        context.putProperty(CoreConstants.EXT_DIR_KEY, extDir);
+      }
+    }
+
+    context.putProperty(CoreConstants.PACKAGE_NAME_KEY, getPackageName());
+    context.putProperty(CoreConstants.VERSION_CODE_KEY, getVersionCode());
+    context.putProperty(CoreConstants.VERSION_NAME_KEY, getVersionName());
+  }
+  /*
   public void setupProperties(Context context) {
     // legacy properties
     context.putProperty(CoreConstants.DATA_DIR_KEY, getFilesDirectoryPath());
@@ -70,6 +102,7 @@ public class AndroidContextUtil {
     context.putProperty(CoreConstants.VERSION_CODE_KEY, getVersionCode());
     context.putProperty(CoreConstants.VERSION_NAME_KEY, getVersionName());
   }
+  */
 
   protected static ContextWrapper getContext() {
     try {
@@ -96,6 +129,27 @@ public class AndroidContextUtil {
    * or {@code null} if not mounted.
    */
   public String getMountedExternalStorageDirectoryPath() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      // For Android 10 (API 29) and above, use the stored logDirectoryUri if available
+      if (logDirectoryUri != null) {
+        return logDirectoryUri.toString();
+      } else {
+        // Fallback to app-specific directory if URI is not set
+        return absPath(context.getExternalFilesDir(null));
+      }
+    } else {
+      // For older Android versions, use the legacy approach
+      String path = null;
+      String state = Environment.getExternalStorageState();
+      if (Environment.MEDIA_MOUNTED.equals(state) ||
+              Environment.MEDIA_MOUNTED_READ_ONLY.equals(state)) {
+        path = getExternalStorageDirectoryPath(); // This will also use logDirectoryUri if set
+      }
+      return path;
+    }
+  }
+
+  /*public String getMountedExternalStorageDirectoryPath() {
     String path = null;
     String state = Environment.getExternalStorageState();
     if (Environment.MEDIA_MOUNTED.equals(state) ||
@@ -103,7 +157,7 @@ public class AndroidContextUtil {
       path = getExternalStorageDirectoryPath();
     }
     return path;
-  }
+  }*/
 
   /**
    * Gets the path to the external storage directory
@@ -120,11 +174,27 @@ public class AndroidContextUtil {
   @SuppressWarnings("deprecation")
   public String getExternalStorageDirectoryPath() {
     if (Build.VERSION.SDK_INT >= 29) {
+      // Use the stored logDirectoryUri if available
+      if (logDirectoryUri != null) {
+        return logDirectoryUri.toString();
+      } else {
+        // Fallback to app-specific directory if URI is not set
+        return absPath(context.getExternalFilesDir(null));
+      }
+    } else {
+      // Use Environment.getExternalStorageDirectory() for older versions
+      return absPath(Environment.getExternalStorageDirectory());
+    }
+  }
+  /*@TargetApi(8)
+  @SuppressWarnings("deprecation")
+  public String getExternalStorageDirectoryPath() {
+    if (Build.VERSION.SDK_INT >= 29) {
       return getExternalFilesDirectoryPath();
     } else {
       return absPath(Environment.getExternalStorageDirectory());
     }
-  }
+  }*/
 
   /**
    * Gets the path to the external storage directory

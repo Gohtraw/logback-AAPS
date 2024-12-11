@@ -3,6 +3,7 @@ package org.slf4j.impl;
 import org.slf4j.ILoggerFactory;
 import org.slf4j.IMarkerFactory;
 import org.slf4j.helpers.BasicMarkerFactory;
+import org.slf4j.helpers.Reporter;
 import org.slf4j.helpers.Util;
 import org.slf4j.spi.MDCAdapter;
 import org.slf4j.spi.SLF4JServiceProvider;
@@ -26,8 +27,8 @@ public class LoggerServiceProvider implements SLF4JServiceProvider {
      * against. The value of this field is usually modified with each release.
      */
     // to avoid constant folding by the compiler, this field must *not* be final
-    public static String REQUESTED_API_VERSION = "2.0.7"; // !final
-    private LoggerContext defaultLoggerContext;;
+    public static String REQUESTED_API_VERSION = "2.0.16"; // !final
+    private LoggerContext defaultLoggerContext;
     private IMarkerFactory markerFactory;
     private MDCAdapter mdcAdapter;
 
@@ -66,7 +67,8 @@ public class LoggerServiceProvider implements SLF4JServiceProvider {
             try {
                 new ContextInitializer(defaultLoggerContext).autoConfig();
             } catch (JoranException je) {
-                Util.report("Failed to auto configure default logger context", je);
+                Reporter.error("Failed to auto configure default logger context", je);
+                // Util.report("Failed to auto configure default logger context", je);
             }
             // LOGBACK-292
             if (!StatusUtil.contextHasStatusListener(defaultLoggerContext)) {
@@ -75,7 +77,7 @@ public class LoggerServiceProvider implements SLF4JServiceProvider {
             // contextSelectorBinder.init(defaultLoggerContext, KEY);
 
         } catch (Exception t) { // see LOGBACK-1159
-            Util.report("Failed to instantiate [" + LoggerContext.class.getName() + "]", t);
+            Reporter.error("Failed to instantiate [" + LoggerContext.class.getName() + "]", t);
         }
     }
 }
